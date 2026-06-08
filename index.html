@@ -442,9 +442,10 @@ tr:hover td { background: var(--bg); }
     <button class="tnav" onclick="irVista('catalogo', this)">📦 Catálogo</button>
   </div>
   <div class="topbar-actions">
-    <button class="tbtn tbtn-ghost" onclick="exportarExcel()">⬇ Guardar Excel</button>
+    <span id="sync-indicator" style="font-size:11px;color:rgba(255,255,255,.6);transition:opacity .5s;opacity:0;align-self:center;margin-right:4px;"></span>
+    <button class="tbtn tbtn-ghost" onclick="exportarExcel()">⬇ Respaldo Excel</button>
     <label class="tbtn tbtn-ghost" style="cursor:pointer;">
-      ⬆ Abrir Excel
+      ⬆ Migrar Excel
       <input type="file" accept=".xlsx" style="display:none" onchange="importarExcel(this)">
     </label>
   </div>
@@ -1005,7 +1006,7 @@ function cobrar() {
   BD.remisiones.push({ id_remision: id_venta, fecha: fecha.toISOString().split('T')[0], nombre_cliente: nombre, telefono: tel, domicilio, notas, factura, tipo_pago, created_at: fecha.toISOString() });
   BD.items.push(...carrito.map(item => ({ id_item: Date.now()+Math.random(), id_remision: id_venta, concepto: item.nombre, unidad: item.unidad, cantidad_pedida: item.cantidad, precio_unitario: item.precio||0 })));
   BD.secuencia++;
-  guardarLocal();
+  guardar();
 
   generarTicketPDF({ id_venta, esCotizacion: false, fecha, nombre, tel, domicilio, notas, tipo_pago, factura, items: itemsTicket, total });
   mostrarToast(`✓ Venta ${id_venta} registrada`);
@@ -1487,7 +1488,7 @@ function cancelarVenta(id) {
   if (!confirm(`¿Cancelar la venta ${id} de ${r.nombre_cliente}?\n\nEl folio quedará anulado en el historial pero no se eliminará.`)) return;
   r.estado = 'CANCELADA';
   r.cancelado_en = new Date().toISOString();
-  guardarLocal();
+  guardar();
   renderVentas();
   mostrarToast(`✕ Venta ${id} cancelada`);
 }
@@ -1536,13 +1537,13 @@ function agregarMat() {
   BD.catalogo.sort((a,b) => a.grupo.localeCompare(b.grupo)||a.nombre.localeCompare(b.nombre));
   document.getElementById('nuevo-mat').value='';
   document.getElementById('nuevo-mat-precio').value='';
-  guardarLocal(); renderCatAdmin(); renderGrupos(); renderCatGrid();
+  guardar(); renderCatAdmin(); renderGrupos(); renderCatGrid();
   mostrarToast('✓ Material agregado al catálogo');
 }
 
 function eliminarMat(i) {
   if (!confirm(`¿Eliminar "${BD.catalogo[i].nombre}"?`)) return;
-  BD.catalogo.splice(i,1); guardarLocal(); renderCatAdmin(); renderGrupos(); renderCatGrid();
+  BD.catalogo.splice(i,1); guardar(); renderCatAdmin(); renderGrupos(); renderCatGrid();
   mostrarToast('Material eliminado');
 }
 
@@ -1570,7 +1571,7 @@ function guardarEditarMat() {
     grupo:  document.getElementById('edit-mat-grupo').value||'Otros'
   };
   BD.catalogo.sort((a,b) => a.grupo.localeCompare(b.grupo)||a.nombre.localeCompare(b.nombre));
-  guardarLocal(); renderCatAdmin(); renderGrupos(); renderCatGrid();
+  guardar(); renderCatAdmin(); renderGrupos(); renderCatGrid();
   cerrarModal('modal-editar-mat');
   mostrarToast('✓ Material actualizado');
   editandoIdx = null;
@@ -1597,8 +1598,11 @@ function mostrarToast(msg) {
 }
 
 // ══════════════════════════════════════════════
-// PERSISTENCIA
+// PERSISTENCIA — Google Sheets + localStorage
 // ══════════════════════════════════════════════
+const API_URL = 'https://script.google.com/macros/s/AKfycbwV3RNgwY-UiXzvEFS52ACuoAM5cpBdEiVuEhhEHKJbMCMFumFI2yYoStYzrpjqJq0E1Q/exec';
+
+// ── LOCAL (caché rápido) ──
 function guardarLocal() {
   try { localStorage.setItem('gamo_bd_v4', JSON.stringify(BD)); } catch(e) {}
 }
@@ -1611,16 +1615,144 @@ function cargarLocal() {
   if (!BD.catalogo.length) BD.catalogo = CATALOGO_BASE.map(m => ({...m}));
 }
 
+// ── SHEETS: GUARDAR (fire-and-forget en background) ──
+function guardarSheets() {
+  const payload = {
+    accion: 'guardar',
+    remisiones: BD.remisiones.map(r => ({
+      ID_Venta:r.id_remision, Fecha:r.fecha, Cliente:r.nombre_cliente,
+      Telefono:r.telefono||'', Domicilio:r.domicilio||'', Notas:r.notas||'',
+      Factura:r.factura?'Sí':'No', Tipo_Pago:r.tipo_pago||'POR_DEFINIR',
+      Estado:r.estado||'ACTIVA', Cancelado_En:r.cancelado_en||'',
+      Total:totalV(r.id_remision), Creado_En:r.created_at||''
+    })),
+    items: BD.items.map(i => ({
+      ID_Item:String(i.id_item), ID_Venta:i.id_remision, Concepto:i.concepto,
+      Unidad:i.unidad||'', Cantidad:i.cantidad_pedida, Precio_Unitario:i.precio_unitario
+    })),
+    clientes: BD.clientes.map(c => ({
+      ID_Cliente:c.id, Nombre:c.nombre, Telefono:c.telefono||''
+    })),
+    catalogo: BD.catalogo.map(m => ({
+      Nombre:m.nombre, Unidad:m.unidad||'', Precio:m.precio||0, Grupo:m.grupo||'Otros'
+    })),
+    secuencia: BD.secuencia
+  };
+
+  fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }).then(r => r.json()).then(res => {
+    if (res.ok) mostrarIndicadorSync('✓ Sincronizado');
+    else console.error('Error Sheets:', res.error);
+  }).catch(err => {
+    console.warn('Sin conexión, datos guardados localmente:', err);
+    mostrarIndicadorSync('⚠ Sin conexión');
+  });
+}
+
+// ── SHEETS: LEER al iniciar ──
+async function cargarSheets() {
+  mostrarCargando(true);
+  try {
+    const res = await fetch(`${API_URL}?accion=leer`);
+    const datos = await res.json();
+
+    if (!datos.ok) throw new Error(datos.error);
+
+    // Solo carga si hay datos en Sheets
+    if (datos.remisiones && datos.remisiones.length > 0) {
+      BD.remisiones = datos.remisiones.map(r => ({
+        id_remision:  String(r.ID_Venta||''),
+        fecha:        String(r.Fecha||''),
+        nombre_cliente: r.Cliente||'',
+        telefono:     String(r.Telefono||''),
+        domicilio:    r.Domicilio||'',
+        notas:        r.Notas||'',
+        factura:      r.Factura === 'Sí',
+        tipo_pago:    r.Tipo_Pago||'POR_DEFINIR',
+        estado:       r.Estado||'ACTIVA',
+        cancelado_en: r.Cancelado_En||'',
+        created_at:   r.Creado_En||''
+      }));
+    }
+
+    if (datos.items && datos.items.length > 0) {
+      BD.items = datos.items.map(i => ({
+        id_item:        parseFloat(i.ID_Item)||Date.now()+Math.random(),
+        id_remision:    String(i.ID_Venta||''),
+        concepto:       i.Concepto||'',
+        unidad:         i.Unidad||'',
+        cantidad_pedida:   parseFloat(i.Cantidad)||0,
+        precio_unitario:   parseFloat(i.Precio_Unitario)||0
+      }));
+    }
+
+    if (datos.clientes && datos.clientes.length > 0) {
+      BD.clientes = datos.clientes.map(c => ({
+        id:       String(c.ID_Cliente||'cli_'+Date.now()),
+        nombre:   c.Nombre||'',
+        telefono: String(c.Telefono||'')
+      }));
+    }
+
+    if (datos.catalogo && datos.catalogo.length > 0) {
+      BD.catalogo = datos.catalogo.map(m => ({
+        nombre:  m.Nombre||'',
+        unidad:  m.Unidad||'',
+        precio:  parseFloat(m.Precio)||0,
+        grupo:   m.Grupo||'Otros'
+      }));
+    }
+
+    if (datos.secuencia) BD.secuencia = parseInt(datos.secuencia)||1;
+
+    guardarLocal(); // actualiza caché local con lo que vino de Sheets
+    mostrarToast('✓ Datos cargados desde Google Sheets');
+
+  } catch(err) {
+    console.warn('No se pudo leer Sheets, usando caché local:', err);
+    mostrarToast('⚠ Sin conexión — usando datos locales');
+  } finally {
+    mostrarCargando(false);
+    renderGrupos();
+    renderCatGrid();
+    document.getElementById('label-venta').style.color   = 'var(--naranja)';
+    document.getElementById('label-cotizacion').style.color = 'var(--txt-3)';
+    document.getElementById('c_nombre').addEventListener('input', recalcTotales);
+  }
+}
+
+// ── GUARDAR local + Sheets ──
+function guardar() {
+  guardarLocal();
+  guardarSheets();
+}
+
+// ── INDICADOR DE SYNC ──
+function mostrarIndicadorSync(msg) {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 3000);
+}
+
+function mostrarCargando(activo) {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  el.textContent = activo ? '⏳ Cargando...' : '';
+  el.style.opacity = activo ? '1' : '0';
+}
+
+// ── EXCEL: EXPORTAR (respaldo manual) ──
 function exportarExcel() {
   const wb = XLSX.utils.book_new();
   const ventas = BD.remisiones.map(r => ({
     ID_Venta:r.id_remision, Fecha:r.fecha, Cliente:r.nombre_cliente, Telefono:r.telefono||'',
     Domicilio:r.domicilio||'', Notas:r.notas||'', Factura:r.factura?'Sí':'No',
-    Tipo_Pago:r.tipo_pago||'POR_DEFINIR',
-    Estado: r.estado || 'ACTIVA',
-    Cancelado_En: r.cancelado_en || '',
-    Total: totalV(r.id_remision),
-    Creado_En:r.created_at||''
+    Tipo_Pago:r.tipo_pago||'POR_DEFINIR', Estado:r.estado||'ACTIVA',
+    Cancelado_En:r.cancelado_en||'', Total:totalV(r.id_remision), Creado_En:r.created_at||''
   }));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(ventas.length?ventas:[{}]),'Ventas');
   const items = BD.items.map(i => ({
@@ -1633,9 +1765,10 @@ function exportarExcel() {
   const cat = BD.catalogo.map(m => ({Nombre:m.nombre,Unidad:m.unidad||'',Precio:m.precio||0,Grupo:m.grupo||'Otros'}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cat.length?cat:[{}]),'Catalogo');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([{Secuencia:BD.secuencia}]),'Config');
-  XLSX.writeFile(wb,`GAMO_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.writeFile(wb,`GAMO_respaldo_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
+// ── EXCEL: IMPORTAR (migración única) ──
 function importarExcel(input) {
   const file = input.files[0]; if (!file) return;
   const reader = new FileReader();
@@ -1646,25 +1779,27 @@ function importarExcel(input) {
       const rV=leer('Ventas'),rI=leer('Items'),rC=leer('Clientes'),rM=leer('Catalogo'),rCfg=leer('Config');
       if (!rV.length&&!rI.length) { alert('Archivo no reconocido como GAMO.'); return; }
       BD.remisiones = rV.filter(r=>r.ID_Venta).map(r => ({
-        id_remision:String(r.ID_Venta),fecha:String(r.Fecha||''),nombre_cliente:r.Cliente||'',
-        telefono:String(r.Telefono||''),domicilio:r.Domicilio||'',notas:r.Notas||'',
-        factura:r.Factura==='Sí',tipo_pago:r.Tipo_Pago||'POR_DEFINIR',
-        estado: r.Estado||'ACTIVA',
-        cancelado_en: r.Cancelado_En||'',
-        created_at:r.Creado_En||''
+        id_remision:String(r.ID_Venta), fecha:String(r.Fecha||''), nombre_cliente:r.Cliente||'',
+        telefono:String(r.Telefono||''), domicilio:r.Domicilio||'', notas:r.Notas||'',
+        factura:r.Factura==='Sí', tipo_pago:r.Tipo_Pago||'POR_DEFINIR',
+        estado:r.Estado||'ACTIVA', cancelado_en:r.Cancelado_En||'', created_at:r.Creado_En||''
       }));
       BD.items = rI.filter(i=>i.ID_Venta).map(i => ({
-        id_item:parseFloat(i.ID_Item)||Date.now()+Math.random(),id_remision:String(i.ID_Venta),
-        concepto:i.Concepto||'',unidad:i.Unidad||'',
-        cantidad_pedida:parseFloat(i.Cantidad)||0,
-        precio_unitario:parseFloat(i.Precio_Unitario)||0
+        id_item:parseFloat(i.ID_Item)||Date.now()+Math.random(), id_remision:String(i.ID_Venta),
+        concepto:i.Concepto||'', unidad:i.Unidad||'',
+        cantidad_pedida:parseFloat(i.Cantidad)||0, precio_unitario:parseFloat(i.Precio_Unitario)||0
       }));
-      BD.clientes = rC.filter(c=>c.Nombre).map(c => ({id:String(c.ID_Cliente||'cli_'+Date.now()),nombre:c.Nombre,telefono:String(c.Telefono||'')}));
-      BD.catalogo = rM.filter(m=>m.Nombre).map(m => ({nombre:m.Nombre,unidad:m.Unidad||'',precio:parseFloat(m.Precio)||0,grupo:m.Grupo||'Otros'}));
+      BD.clientes = rC.filter(c=>c.Nombre).map(c => ({
+        id:String(c.ID_Cliente||'cli_'+Date.now()), nombre:c.Nombre, telefono:String(c.Telefono||'')
+      }));
+      BD.catalogo = rM.filter(m=>m.Nombre).map(m => ({
+        nombre:m.Nombre, unidad:m.Unidad||'', precio:parseFloat(m.Precio)||0, grupo:m.Grupo||'Otros'
+      }));
       if (!BD.catalogo.length) BD.catalogo = CATALOGO_BASE.map(m=>({...m}));
       BD.secuencia = rCfg.length?(parseInt(rCfg[0].Secuencia)||1):1;
-      guardarLocal(); renderGrupos(); renderCatGrid();
-      mostrarToast(`✓ ${BD.remisiones.length} ventas · ${BD.clientes.length} clientes cargados`);
+      guardar(); // guarda local + sincroniza a Sheets
+      renderGrupos(); renderCatGrid();
+      mostrarToast(`✓ ${BD.remisiones.length} ventas migradas → sincronizando con Sheets...`);
     } catch(err) { console.error(err); alert('Error al leer el archivo Excel.'); }
   };
   reader.readAsBinaryString(file); input.value='';
@@ -1673,15 +1808,8 @@ function importarExcel(input) {
 // ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
-cargarLocal();
-renderGrupos();
-renderCatGrid();
-// Inicializar colores del toggle
-document.getElementById('label-venta').style.color   = 'var(--naranja)';
-document.getElementById('label-cotizacion').style.color = 'var(--txt-3)';
-
-// Trigger recalc on cliente input change
-document.getElementById('c_nombre').addEventListener('input', recalcTotales);
+cargarLocal();       // carga caché inmediato para no mostrar app vacía
+cargarSheets();      // luego sobreescribe con datos frescos de Sheets
 </script>
 </body>
 </html>
