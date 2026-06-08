@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAMO — Punto de Venta</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #F2F1EE;
+  --surface:   #FFFFFF;
+  --border:    #E4E2DC;
+  --txt:       #1A1A18;
+  --txt-2:     #6B6B67;
+  --txt-3:     #A8A89F;
+  --azul:      #1A56DB;
+  --azul-soft: #EBF0FD;
+  --verde:     #0F7B45;
+  --verde-soft:#E6F5EC;
+  --naranja:   #C25E00;
+  --naranja-soft:#FEF0E0;
+  --rojo:      #C13030;
+  --rojo-soft: #FDEDED;
+  --accent:    #1A1A18;
+  --sombra:    0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.05);
+  --sombra-lg: 0 4px 24px rgba(0,0,0,.12);
+  --r:         10px;
+  --r-sm:      7px;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+/* ── TOPBAR ── */
+#topbar {
+  height: 52px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.topbar-logo {
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  letter-spacing: -.3px;
+  margin-right: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-logo span { font-size: 11px; color: rgba(255,255,255,.45); font-weight: 400; margin-top: 1px; }
+
+.topbar-nav { display: flex; gap: 2px; flex: 1; }
+.tnav { background: none; border: none; color: rgba(255,255,255,.55); font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: var(--r-sm); cursor: pointer; font-family: inherit; transition: all .15s; }
+.tnav:hover { background: rgba(255,255,255,.08); color: #fff; }
+.tnav.active { background: rgba(255,255,255,.13); color: #fff; }
+
+.topbar-actions { display: flex; gap: 8px; margin-left: auto; }
+.tbtn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: all .15s; }
+.tbtn-ghost { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); }
+.tbtn-ghost:hover { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ── LAYOUT ── */
+#workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── PANEL IZQUIERDO: CATÁLOGO ── */
+#panel-catalogo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.cat-search {
+  padding: 14px 16px 10px;
+  flex-shrink: 0;
+}
+.search-input-wrap { position: relative; }
+.search-input-wrap input {
+  width: 100%; padding: 9px 12px 9px 36px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 14px; font-family: inherit;
+  background: var(--surface);
+  outline: none; color: var(--txt);
+  transition: border-color .15s;
+}
+.search-input-wrap input:focus { border-color: var(--azul); }
+.search-ico { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--txt-3); font-size: 14px; pointer-events: none; }
+
+.cat-grupos { padding: 0 16px 10px; display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+.grupo-pill {
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--txt-2);
+  transition: all .15s; white-space: nowrap;
+}
+.grupo-pill:hover { border-color: var(--txt-2); color: var(--txt); }
+.grupo-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.cat-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.mat-btn {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px 12px 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all .12s;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: relative;
+  overflow: visible;
+  word-break: break-word;
+}
+.mat-btn:hover {
+  border-color: var(--azul);
+  box-shadow: 0 0 0 3px var(--azul-soft);
+  transform: translateY(-1px);
+}
+.mat-btn:active { transform: scale(.97); }
+.mat-btn .mat-nombre {
+  font-size: 12px; font-weight: 600; color: var(--txt); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding-right: 14px; /* espacio para el badge */
+}
+.mat-btn .mat-unidad { font-size: 11px; color: var(--txt-3); font-weight: 500; font-family: 'DM Mono', monospace; }
+.mat-btn .mat-en-carrito {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--azul); color: #fff;
+  font-size: 10px; font-weight: 700;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace;
+  flex-shrink: 0;
+}
+
+/* ── PANEL DERECHO: CARRITO ── */
+#panel-carrito {
+  width: 380px;
+  min-width: 360px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.carrito-header {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.carrito-header h3 { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+
+/* CLIENTE SELECTOR */
+.cliente-select-wrap { position: relative; }
+.cliente-input {
+  width: 100%; padding: 8px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 13px; font-family: inherit;
+  color: var(--txt); background: var(--bg);
+  outline: none; transition: border-color .15s;
+}
+.cliente-input:focus { border-color: var(--azul); background: var(--surface); }
+.cliente-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surface); border: 1.5px solid var(--azul);
+  border-radius: var(--r-sm); box-shadow: var(--sombra-lg);
+  z-index: 300; display: none; max-height: 180px; overflow-y: auto;
+}
+.cliente-dropdown.visible { display: block; }
+.cli-opt { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.cli-opt:last-child { border-bottom: none; }
+.cli-opt:hover { background: var(--azul-soft); }
+.cli-opt .on { font-weight: 600; font-size: 13px; }
+.cli-opt .ot { font-size: 11px; color: var(--txt-3); }
+
+/* CARRITO ITEMS */
+.carrito-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.carrito-empty {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 100%; color: var(--txt-3);
+  gap: 8px; font-size: 13px;
+}
+.carrito-empty .ico { font-size: 32px; }
+
+.carrito-item {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.ci-nombre { font-size: 13px; font-weight: 600; line-height: 1.3; flex: 1; }
+.ci-del { background: none; border: none; color: var(--txt-3); cursor: pointer; font-size: 16px; padding: 0 2px; line-height: 1; border-radius: 4px; }
+.ci-del:hover { color: var(--rojo); background: var(--rojo-soft); }
+.ci-controles { display: flex; align-items: center; gap: 6px; }
+.ci-label { font-size: 11px; color: var(--txt-3); font-weight: 500; min-width: 40px; }
+.ci-input {
+  padding: 5px 7px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px; font-family: 'DM Mono', monospace;
+  color: var(--txt); text-align: right;
+  outline: none; width: 80px;
+  transition: border-color .15s;
+}
+.ci-input:focus { border-color: var(--azul); }
+.ci-importe { font-size: 13px; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--txt); margin-left: auto; min-width: 70px; text-align: right; }
+
+/* TOTALES */
+.carrito-totales {
+  border-top: 1.5px solid var(--border);
+  padding: 12px 18px;
+  flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tot-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.tot-label { color: var(--txt-2); }
+.tot-val { font-weight: 600; font-family: 'DM Mono', monospace; }
+.tot-row.final { font-size: 17px; font-weight: 700; padding-top: 6px; border-top: 1px solid var(--border); margin-top: 2px; }
+
+.desc-wrap { display: flex; align-items: center; gap: 6px; }
+.desc-input { width: 60px; text-align: right; padding: 3px 7px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 13px; font-family: 'DM Mono', monospace; outline: none; }
+.desc-input:focus { border-color: var(--azul); }
+.desc-pct { font-size: 12px; color: var(--txt-3); }
+
+/* OPCIONES VENTA */
+.carrito-opts {
+  padding: 8px 18px;
+  display: flex; gap: 8px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.opt-check { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--txt-2); cursor: pointer; padding: 4px 10px; border-radius: 6px; border: 1.5px solid var(--border); background: var(--bg); transition: all .15s; user-select: none; }
+.opt-check input { accent-color: var(--azul); width: 14px; height: 14px; }
+.opt-check:has(input:checked) { border-color: var(--azul); background: var(--azul-soft); color: var(--azul); }
+
+/* NOTAS */
+.carrito-notas { padding: 0 18px 8px; flex-shrink: 0; }
+.notas-input { width: 100%; padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 12px; font-family: inherit; color: var(--txt); background: var(--bg); outline: none; resize: none; transition: border-color .15s; }
+.notas-input:focus { border-color: var(--azul); }
+
+/* COBRAR BTN */
+.carrito-footer {
+  padding: 12px 18px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+}
+.btn-cobrar {
+  width: 100%; padding: 14px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: var(--r);
+  font-size: 16px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+  transition: all .15s;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.btn-cobrar:hover { background: #2d2d2b; transform: translateY(-1px); box-shadow: var(--sombra-lg); }
+.btn-cobrar:active { transform: scale(.98); }
+.btn-cobrar:disabled { background: var(--border); color: var(--txt-3); cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-cobrar .cobrar-total { font-family: 'DM Mono', monospace; }
+
+.btn-limpiar {
+  width: 100%; padding: 7px;
+  background: none; border: none;
+  color: var(--txt-3); font-size: 12px;
+  font-family: inherit; cursor: pointer;
+  margin-top: 6px; border-radius: 6px;
+  transition: all .15s;
+}
+.btn-limpiar:hover { color: var(--rojo); background: var(--rojo-soft); }
+
+/* ══ VISTAS SECUNDARIAS ══ */
+#vistas-secundarias {
+  flex: 1; overflow-y: auto;
+  padding: 28px 32px;
+  display: none;
+}
+#vistas-secundarias.visible { display: block; }
+
+/* CARDS */
+.card { background: var(--surface); border-radius: var(--r); box-shadow: var(--sombra); padding: 20px; border: 1px solid var(--border); }
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 4px; }
+.page-sub { font-size: 13px; color: var(--txt-2); margin-bottom: 22px; }
+
+/* STATS */
+.stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+.stat-c { background: var(--surface); border-radius: var(--r); padding: 16px 18px; border: 1px solid var(--border); }
+.stat-l { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--txt-3); margin-bottom: 4px; }
+.stat-v { font-size: 22px; font-weight: 700; letter-spacing: -.5px; font-family: 'DM Mono', monospace; }
+
+/* TABLA */
+.tabla-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--txt-3); border-bottom: 1.5px solid var(--border); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+.th-r { text-align: right; }
+.td-r { text-align: right; font-family: 'DM Mono', monospace; }
+
+/* TABS */
+.tabs { display: flex; gap: 3px; background: var(--bg); padding: 3px; border-radius: 9px; width: fit-content; margin-bottom: 16px; border: 1px solid var(--border); }
+.tab { padding: 5px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: none; color: var(--txt-3); font-family: inherit; transition: all .15s; }
+.tab.active { background: var(--surface); color: var(--txt); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+/* BADGES */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.b-verde  { background: var(--verde-soft);  color: var(--verde); }
+.b-naranja{ background: var(--naranja-soft); color: var(--naranja); }
+.b-rojo   { background: var(--rojo-soft);   color: var(--rojo); }
+.b-azul   { background: var(--azul-soft);   color: var(--azul); }
+.b-gris   { background: var(--bg);          color: var(--txt-3); border: 1px solid var(--border); }
+.b-morado { background: #F3EEFF;            color: #6B21A8; }
+
+/* ID VENTA */
+.id-tag { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; background: var(--azul-soft); color: var(--azul); padding: 2px 8px; border-radius: 5px; }
+
+/* PROGRESS */
+.prog { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; background: var(--azul); }
+.prog-fill.done { background: var(--verde); }
+
+/* CLIENTE CARD */
+.cli-card { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+.cli-card-head { padding: 13px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; gap: 12px; }
+.cli-card-head:hover { background: var(--bg); }
+.cli-body { padding: 0 16px 14px; border-top: 1px solid var(--border); display: none; }
+.cli-body.open { display: block; }
+
+/* SECCION TITULO */
+.sec-tit { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--txt-3); margin-bottom: 8px; margin-top: 14px; }
+
+/* FORM */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.col-2 { grid-column: span 2; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--txt-3); }
+.field input, .field select { padding: 8px 11px; border: 1.5px solid var(--border); border-radius: var(--r-sm); font-size: 14px; font-family: inherit; color: var(--txt); background: var(--surface); outline: none; transition: border-color .15s; width: 100%; }
+.field input:focus, .field select:focus { border-color: var(--azul); }
+
+/* MODAL */
+.modal-bd { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); backdrop-filter: blur(3px); z-index: 500; align-items: center; justify-content: center; }
+.modal-bd.visible { display: flex; }
+.modal { background: var(--surface); border-radius: 14px; box-shadow: var(--sombra-lg); padding: 26px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); }
+.modal-wide { width: 600px; }
+.modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+.modal-sub { font-size: 12px; color: var(--txt-3); margin-bottom: 18px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* BTNS GENERALES */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: all .15s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #2d2d2b; }
+.btn-secondary { background: var(--bg); color: var(--txt-2); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-ghost { background: none; color: var(--azul); font-size: 12px; font-weight: 600; padding: 5px 9px; border-radius: 6px; }
+.btn-ghost:hover { background: var(--azul-soft); }
+.btn-sm { padding: 5px 11px; font-size: 12px; }
+.btn-full { width: 100%; justify-content: center; }
+.btn-del-row { background: none; border: none; color: var(--txt-3); font-size: 16px; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
+.btn-del-row:hover { color: var(--rojo); background: var(--rojo-soft); }
+
+/* CATALOGO ADMIN */
+.cat-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); margin-bottom: 5px; background: var(--surface); }
+
+/* MODAL PAGO LISTA */
+.pago-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: var(--r-sm); margin-bottom: 5px; cursor: pointer; transition: all .15s; }
+.pago-row.sel { border-color: var(--azul); background: var(--azul-soft); }
+
+/* SEARCH */
+.s-wrap { position: relative; }
+.s-wrap input { width: 100%; padding: 8px 12px 8px 34px; border: 1.5px solid var(--border); border-radius: var(--r-sm); font-size: 13px; font-family: inherit; outline: none; background: var(--surface); color: var(--txt); transition: border-color .15s; }
+.s-wrap input:focus { border-color: var(--azul); }
+.s-ico { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--txt-3); font-size: 13px; pointer-events: none; }
+
+/* SUCCESS TOAST */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--accent); color: #fff; padding: 12px 22px; border-radius: 24px; font-size: 14px; font-weight: 600; box-shadow: var(--sombra-lg); z-index: 999; transition: transform .3s cubic-bezier(.34,1.56,.64,1); white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* SCROLL */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* EMPTY */
+.empty { text-align: center; padding: 44px; color: var(--txt-3); }
+.empty .ei { font-size: 32px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div id="topbar">
+  <div class="topbar-logo">GAMO <span>Punto de Venta</span></div>
+  <div class="topbar-nav">
+    <button class="tnav active" onclick="irPOS(this)">🏪 Venta</button>
+    <button class="tnav" onclick="irVista('ventas', this)">📋 Historial</button>
+    <button class="tnav" onclick="irVista('catalogo', this)">📦 Catálogo</button>
+  </div>
+  <div class="topbar-actions">
+    <button class="tbtn tbtn-ghost" onclick="exportarExcel()">⬇ Guardar Excel</button>
+    <label class="tbtn tbtn-ghost" style="cursor:pointer;">
+      ⬆ Abrir Excel
+      <input type="file" accept=".xlsx" style="display:none" onchange="importarExcel(this)">
+    </label>
+  </div>
+</div>
+
+<!-- ══ POS LAYOUT ══ -->
+<div id="workspace">
+
+  <!-- PANEL IZQUIERDO: CATÁLOGO -->
+  <div id="panel-catalogo">
+    <div class="cat-search">
+      <div class="search-input-wrap">
+        <span class="search-ico">🔍</span>
+        <input type="text" id="cat-buscar" placeholder="Buscar material..." oninput="renderCatGrid()">
+      </div>
+    </div>
+    <div class="cat-grupos" id="cat-grupos"></div>
+    <div class="cat-grid" id="cat-grid"></div>
+  </div>
+
+  <!-- PANEL DERECHO: CARRITO -->
+  <div id="panel-carrito">
+    <div class="carrito-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 id="carrito-titulo">Venta en curso</h3>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;">
+          <span style="font-size:12px;font-weight:600;" id="label-venta">Venta</span>
+          <div style="position:relative;width:38px;height:20px;" onclick="toggleModo()">
+            <input type="checkbox" id="modo-cotizacion" style="opacity:0;width:0;height:0;position:absolute;">
+            <div id="modo-track" style="position:absolute;inset:0;background:var(--gris-300,#D1D1D6);border-radius:20px;transition:background .2s;"></div>
+            <div id="modo-thumb" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s;"></div>
+          </div>
+          <span style="font-size:12px;font-weight:600;" id="label-cotizacion">Cotización</span>
+        </label>
+      </div>
+      <div class="cliente-select-wrap">
+        <input class="cliente-input" type="text" id="c_nombre"
+          placeholder="Cliente..." autocomplete="off"
+          oninput="filtrarDropdownCarrito()" onfocus="filtrarDropdownCarrito()">
+        <div class="cliente-dropdown" id="dd-carrito"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="cliente-input" type="text" id="c_telefono" placeholder="Teléfono" style="flex:1;">
+        <input class="cliente-input" type="text" id="c_domicilio" placeholder="Dirección/Referencia" style="flex:2;">
+      </div>
+    </div>
+
+    <div class="carrito-items" id="carrito-items">
+      <div class="carrito-empty" id="carrito-empty">
+        <div class="ico">🧱</div>
+        <span>Selecciona materiales del catálogo</span>
+      </div>
+    </div>
+
+    <div class="carrito-totales">
+      <div class="tot-row final">
+        <span>Total</span>
+        <span id="t-total">$0.00</span>
+      </div>
+    </div>
+
+    <div class="carrito-opts" style="flex-direction:column;gap:8px;padding:10px 18px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label class="opt-check" style="flex-shrink:0;">
+          <input type="checkbox" id="c_factura"> Factura
+        </label>
+        <select id="c_tipo_pago" class="cliente-input" style="flex:1;font-size:13px;padding:5px 10px;">
+          <option value="POR_DEFINIR">Pago: Por definir</option>
+          <option value="EFECTIVO">Pago: Efectivo</option>
+          <option value="TARJETA">Pago: Tarjeta</option>
+          <option value="TRANSFERENCIA">Pago: Transferencia</option>
+        </select>
+      </div>
+      <input class="cliente-input" type="text" id="c_notas" placeholder="Notas..." style="font-size:12px;padding:5px 10px;">
+    </div>
+
+    <div class="carrito-footer">
+      <button class="btn-cobrar" id="btn-cobrar" onclick="cobrar()" disabled>
+        <span id="btn-cobrar-label">Cobrar</span>
+        <span class="cobrar-total" id="cobrar-total">$0.00</span>
+      </button>
+      <button class="btn-limpiar" onclick="limpiarCarrito()">✕ Limpiar carrito</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VISTAS SECUNDARIAS ══ -->
+<div id="vistas-secundarias">
+
+  <!-- VENTAS -->
+  <div class="vista-sec" id="sec-ventas" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div class="page-title">Historial</div>
+        <div class="page-sub">Registro completo de todas las ventas</div>
+      </div>
+      <div class="tabs" style="margin-bottom:0;">
+        <button class="tab active" id="tab-dia" onclick="setFiltroPeriodo('dia',this)">Hoy</button>
+        <button class="tab" id="tab-semana" onclick="setFiltroPeriodo('semana',this)">Esta semana</button>
+        <button class="tab" id="tab-todo" onclick="setFiltroPeriodo('todo',this)">Todo</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="card" style="margin-bottom:18px;margin-top:14px;" id="dash-ventas"></div>
+
+    <!-- BUSCADOR -->
+    <div class="s-wrap" style="margin-bottom:16px;">
+      <span class="s-ico">🔍</span>
+      <input type="text" id="buscar-venta" placeholder="Buscar por cliente o ID de venta..." oninput="renderVentas()">
+    </div>
+
+    <!-- LISTA -->
+    <div id="lista-ventas"></div>
+  </div>
+
+  <!-- CATÁLOGO ADMIN -->
+  <div class="vista-sec" id="sec-catalogo" style="display:none;">
+    <div class="page-title">Catálogo de Materiales</div>
+    <div class="page-sub">Agrega o elimina materiales disponibles en ventas</div>
+    <div class="card" style="max-width:580px;">
+      <!-- AGREGAR NUEVO -->
+      <div style="display:grid;grid-template-columns:1fr 100px 90px 80px auto;gap:8px;margin-bottom:16px;align-items:end;">
+        <div class="field" style="margin:0;">
+          <label>Descripción</label>
+          <input type="text" id="nuevo-mat" placeholder="Nombre del material..." onkeydown="if(event.key==='Enter')agregarMat()" style="padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:inherit;outline:none;">
+        </div>
+        <div class="field" style="margin:0;">
+          <label>Unidad</label>
+          <select id="nuevo-mat-unidad" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:13px;outline:none;">
+            <option value="">—</option>
+            <option>Pieza</option><option>Bulto</option><option>M3</option>
+            <option>Ml</option><option>KG</option><option>Bolsa</option>
+            <option>Viaje</option><option>Bote</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label>Precio $</label>
+          <input type="number" id="nuevo-mat-precio" min="0" step="any" placeholder="0.00" style="padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:'DM Mono',monospace;outline:none;text-align:right;">
+        </div>
+        <div class="field" style="margin:0;">
+          <label>Grupo</label>
+          <select id="nuevo-mat-grupo" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:13px;outline:none;">
+            <option>Cemento</option><option>Arena y Grava</option><option>Acero</option>
+            <option>Tabicón y Block</option><option>Adoquín</option><option>Losa</option>
+            <option>Tubular y Lámina</option><option>Postes</option><option>Sonotubo</option><option>Otros</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="agregarMat()" style="align-self:end;">＋ Agregar</button>
+      </div>
+
+      <!-- BUSCADOR -->
+      <div class="s-wrap" style="margin-bottom:12px;">
+        <span class="s-ico">🔍</span>
+        <input type="text" id="cat-admin-buscar" placeholder="Buscar en catálogo..." oninput="renderCatAdmin()">
+      </div>
+
+      <!-- TABLA -->
+      <div class="tabla-wrap">
+        <table id="tabla-cat-admin">
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th>Unidad</th>
+              <th>Grupo</th>
+              <th class="th-r">Precio venta</th>
+              <th style="width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody id="lista-cat-admin"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: EDITAR MATERIAL -->
+<div class="modal-bd" id="modal-editar-mat">
+  <div class="modal">
+    <h3>Editar Material</h3>
+    <p class="modal-sub">Modifica descripción, unidad, precio o grupo</p>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="field">
+        <label>Descripción</label>
+        <input type="text" id="edit-mat-nombre">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Unidad</label>
+          <select id="edit-mat-unidad">
+            <option value="">—</option>
+            <option>Pieza</option><option>Bulto</option><option>M3</option>
+            <option>Ml</option><option>KG</option><option>Bolsa</option>
+            <option>Viaje</option><option>Bote</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Precio venta ($)</label>
+          <input type="number" id="edit-mat-precio" min="0" step="any" style="font-family:'DM Mono',monospace;">
+        </div>
+      </div>
+      <div class="field">
+        <label>Grupo</label>
+        <select id="edit-mat-grupo">
+          <option>Cemento</option><option>Arena y Grava</option><option>Acero</option>
+          <option>Tabicón y Block</option><option>Adoquín</option><option>Losa</option>
+          <option>Tubular y Lámina</option><option>Postes</option><option>Sonotubo</option><option>Otros</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modal-editar-mat')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEditarMat()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+// CATÁLOGO BASE Y GRUPOS
+// ══════════════════════════════════════════════
+const CATALOGO_BASE = [
+  // Cemento y Cal
+  {nombre:'Calhidra 25kg',unidad:'Bulto',precio:237,grupo:'Cemento'},
+  {nombre:'Cemento Gris Cruz Azul 50kg',unidad:'Bulto',precio:250,grupo:'Cemento'},
+  {nombre:'Cemento Gris Tolteca 50kg',unidad:'Bulto',precio:260,grupo:'Cemento'},
+  {nombre:'Cemento Gris Holcim 50kg',unidad:'Bulto',precio:260,grupo:'Cemento'},
+  {nombre:'Cemento Blanco Cemex 50kg',unidad:'Bulto',precio:253,grupo:'Cemento'},
+  {nombre:'Cemento Gris Jaguar 50kg',unidad:'Bulto',precio:240,grupo:'Cemento'},
+  {nombre:'Cemento Gris Tolteca 25kg',unidad:'Bulto',precio:125,grupo:'Cemento'},
+  {nombre:'Cemento Gris Apasco 25kg',unidad:'Bulto',precio:130,grupo:'Cemento'},
+  {nombre:'Mortero Tolteca 50kg',unidad:'Bulto',precio:245,grupo:'Cemento'},
+  {nombre:'Mortero Holcim 50kg',unidad:'Bulto',precio:240,grupo:'Cemento'},
+  {nombre:'Estuco Adeblock Constructor',unidad:'Bulto',precio:275,grupo:'Cemento'},
+  // Arena y Grava
+  {nombre:'Arena de Banco 6m3',unidad:'M3',precio:433,grupo:'Arena y Grava'},
+  {nombre:'Arena de Banco 5m3',unidad:'M3',precio:480,grupo:'Arena y Grava'},
+  {nombre:'Arena de Banco 4m3',unidad:'M3',precio:525,grupo:'Arena y Grava'},
+  {nombre:'Arena de Banco 3m3',unidad:'M3',precio:600,grupo:'Arena y Grava'},
+  {nombre:'Arena de Banco 2m3',unidad:'M3',precio:750,grupo:'Arena y Grava'},
+  {nombre:'Arena de Banco 1m3',unidad:'M3',precio:800,grupo:'Arena y Grava'},
+  {nombre:'Arena de Banco .5m3',unidad:'M3',precio:450,grupo:'Arena y Grava'},
+  {nombre:'Arena de Banco Bote',unidad:'M3',precio:20,grupo:'Arena y Grava'},
+  {nombre:'Arena Cribada bote',unidad:'M3',precio:30,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' 6m3',unidad:'M3',precio:867,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' 5m3',unidad:'M3',precio:960,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' 4m3',unidad:'M3',precio:405,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' 3m3',unidad:'M3',precio:1100,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' 2m3',unidad:'M3',precio:1350,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' 1m3',unidad:'M3',precio:1400,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' .5m3',unidad:'M3',precio:750,grupo:'Arena y Grava'},
+  {nombre:'Grava Triturada 3/4\'\' bote',unidad:'M3',precio:40,grupo:'Arena y Grava'},
+  {nombre:'Piedra Bola Cimentación',unidad:'M3',precio:1600,grupo:'Arena y Grava'},
+  // Acero
+  {nombre:'Varilla 3/8\'\'',unidad:'Pieza',precio:165,grupo:'Acero'},
+  {nombre:'Varilla 1/2\'\'',unidad:'Pieza',precio:295,grupo:'Acero'},
+  {nombre:'Varilla 5/8\'\'',unidad:'Pieza',precio:460,grupo:'Acero'},
+  {nombre:'Armex 10*10',unidad:'Pieza',precio:220,grupo:'Acero'},
+  {nombre:'Armex 10*15',unidad:'Pieza',precio:230,grupo:'Acero'},
+  {nombre:'Alambre Recocido',unidad:'KG',precio:38,grupo:'Acero'},
+  {nombre:'Alambrón',unidad:'KG',precio:32,grupo:'Acero'},
+  // Tubular y Lámina
+  {nombre:'Tubular 6m 3*1 1/2 C.22',unidad:'Pieza',precio:606,grupo:'Tubular y Lámina'},
+  {nombre:'Tubular 6m 3*1 1/2 C.20',unidad:'Pieza',precio:588,grupo:'Tubular y Lámina'},
+  {nombre:'Tubular 6m 3*1 1/2 C.18 Rojo Óxido',unidad:'Pieza',precio:552,grupo:'Tubular y Lámina'},
+  {nombre:'Tubular 6m 3*1 1/2 C.18 Rojo',unidad:'Pieza',precio:469,grupo:'Tubular y Lámina'},
+  {nombre:'Tubular 6m 3*1 1/2 C.18 Galvanizado',unidad:'Pieza',precio:380,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 2.44m C.32',unidad:'Pieza',precio:243,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 3.05m C.32',unidad:'Pieza',precio:304,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 3.66m C.32',unidad:'Pieza',precio:366,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 4.27m C.32',unidad:'Pieza',precio:385,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 4.88m C.32',unidad:'Pieza',precio:486,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 5.5m C.32',unidad:'Pieza',precio:549,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 6.10m C.32',unidad:'Pieza',precio:607,grupo:'Tubular y Lámina'},
+  {nombre:'Lámina de Zinc 7.32m C.32',unidad:'Pieza',precio:728,grupo:'Tubular y Lámina'},
+  // Clavos y Otros
+  {nombre:'Clavo Madera 2\'\' 1/2',unidad:'KG',precio:46,grupo:'Otros'},
+  {nombre:'Clavo Concreto 2\'\'',unidad:'KG',precio:120,grupo:'Otros'},
+  {nombre:'Lavadero chico sin pileta',unidad:'Pieza',precio:550,grupo:'Otros'},
+  {nombre:'Punta Broca',unidad:'Bolsa',precio:150,grupo:'Otros'},
+  // Postes
+  {nombre:'Poste Concreto Circular 2m',unidad:'Pieza',precio:300,grupo:'Postes'},
+  {nombre:'Poste Concreto Circular 2.5m',unidad:'Pieza',precio:330,grupo:'Postes'},
+  {nombre:'Poste Concreto Cuadrado 2m',unidad:'Pieza',precio:320,grupo:'Postes'},
+  {nombre:'Poste Concreto Cuadrado 2.5m',unidad:'Pieza',precio:360,grupo:'Postes'},
+  // Tabicón y Block
+  {nombre:'Tabicón Ligero',unidad:'Pieza',precio:11,grupo:'Tabicón y Block'},
+  {nombre:'Tabicón Pesado',unidad:'Pieza',precio:11,grupo:'Tabicón y Block'},
+  {nombre:'Tabicón Ligero C1',unidad:'Pieza',precio:11,grupo:'Tabicón y Block'},
+  {nombre:'Block Sólido 102040',unidad:'Pieza',precio:24,grupo:'Tabicón y Block'},
+  {nombre:'Block Sólido 122040',unidad:'Pieza',precio:25,grupo:'Tabicón y Block'},
+  {nombre:'Block Sólido 142040',unidad:'Pieza',precio:28,grupo:'Tabicón y Block'},
+  {nombre:'Block Hueco 142040',unidad:'Pieza',precio:26,grupo:'Tabicón y Block'},
+  {nombre:'Block Ligero 102040',unidad:'Pieza',precio:28,grupo:'Tabicón y Block'},
+  {nombre:'Block Ligero 122040',unidad:'Pieza',precio:29,grupo:'Tabicón y Block'},
+  {nombre:'Block Ligero 142040',unidad:'Pieza',precio:32,grupo:'Tabicón y Block'},
+  // Adoquín
+  {nombre:'Adoquín Color Tipo I',unidad:'Pieza',precio:10,grupo:'Adoquín'},
+  {nombre:'Adoquín Color Tipo Taba',unidad:'Pieza',precio:18,grupo:'Adoquín'},
+  {nombre:'Adoquín Color Hexagonal',unidad:'Pieza',precio:18,grupo:'Adoquín'},
+  {nombre:'Adoquín Color Cuadrado',unidad:'Pieza',precio:14,grupo:'Adoquín'},
+  {nombre:'Adoquín Color Rectangular 15*30',unidad:'Pieza',precio:16,grupo:'Adoquín'},
+  {nombre:'Adoquín Color Rectangular 10*20',unidad:'Pieza',precio:7,grupo:'Adoquín'},
+  {nombre:'Adoquín Color Tipo Flor',unidad:'Pieza',precio:6,grupo:'Adoquín'},
+  {nombre:'Adoquín Natural Tipo I',unidad:'Pieza',precio:9,grupo:'Adoquín'},
+  {nombre:'Adoquín Natural Tipo Taba',unidad:'Pieza',precio:17,grupo:'Adoquín'},
+  {nombre:'Adoquín Natural Hexagonal',unidad:'Pieza',precio:17,grupo:'Adoquín'},
+  {nombre:'Adoquín Natural Cuadrado',unidad:'Pieza',precio:14,grupo:'Adoquín'},
+  {nombre:'Adoquín Natural Rectangular 15*30',unidad:'Pieza',precio:15,grupo:'Adoquín'},
+  {nombre:'Adoquín Natural Rectangular 10*20',unidad:'Pieza',precio:7,grupo:'Adoquín'},
+  {nombre:'Adoquín Natural Tipo Flor',unidad:'Pieza',precio:6,grupo:'Adoquín'},
+  {nombre:'Celosía Natural Tipo Margarita',unidad:'Pieza',precio:40,grupo:'Adoquín'},
+  // Losa
+  {nombre:'Vigueta Alma Abierta',unidad:'Ml',precio:220,grupo:'Losa'},
+  {nombre:'Bovedilla Tepezil 137520',unidad:'Pieza',precio:34,grupo:'Losa'},
+  // Sonotubo
+  {nombre:'Sonotubo 15 cm',unidad:'Pieza',precio:0,grupo:'Sonotubo'},
+  {nombre:'Sonotubo 20 cm',unidad:'Pieza',precio:0,grupo:'Sonotubo'},
+  {nombre:'Sonotubo 25 cm',unidad:'Pieza',precio:0,grupo:'Sonotubo'},
+  {nombre:'Sonotubo 30 cm',unidad:'Pieza',precio:0,grupo:'Sonotubo'},
+  {nombre:'Sonotubo 35 cm',unidad:'Pieza',precio:0,grupo:'Sonotubo'},
+  {nombre:'Sonotubo 40 cm',unidad:'Pieza',precio:0,grupo:'Sonotubo'},
+];
+
+// ══════════════════════════════════════════════
+// BD
+// ══════════════════════════════════════════════
+let BD = { remisiones:[], items:[], clientes:[], catalogo:[], secuencia:1 };
+
+// CARRITO
+let carrito = []; // [{id, nombre, unidad, cantidad, precio}]
+
+// Estado de vistas
+let vistaActual = 'pos';
+let grupoActivo = 'Todos';
+
+// ══════════════════════════════════════════════
+// NAVEGACIÓN
+// ══════════════════════════════════════════════
+function irPOS(btn) {
+  vistaActual = 'pos';
+  document.getElementById('workspace').style.display = 'flex';
+  document.getElementById('vistas-secundarias').classList.remove('visible');
+  document.querySelectorAll('.tnav').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  cerrarTodosDD();
+}
+
+function irVista(nombre, btn) {
+  vistaActual = nombre;
+  document.getElementById('workspace').style.display = 'none';
+  document.getElementById('vistas-secundarias').classList.add('visible');
+  document.querySelectorAll('.vista-sec').forEach(v => v.style.display = 'none');
+  document.getElementById('sec-' + nombre).style.display = 'block';
+  document.querySelectorAll('.tnav').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  cerrarTodosDD();
+  if (nombre === 'entregas') renderEntregas();
+  if (nombre === 'ventas')   renderVentas();
+  if (nombre === 'catalogo') renderCatAdmin();
+}
+
+// ══════════════════════════════════════════════
+// CATÁLOGO GRID (panel izq)
+// ══════════════════════════════════════════════
+function renderGrupos() {
+  const grupos = ['Todos', ...new Set(BD.catalogo.map(m => m.grupo || 'Otros'))];
+  document.getElementById('cat-grupos').innerHTML = grupos.map(g =>
+    `<button class="grupo-pill ${g===grupoActivo?'active':''}" onclick="setGrupo('${g}')">${g}</button>`
+  ).join('');
+}
+
+function setGrupo(g) {
+  grupoActivo = g;
+  renderGrupos();
+  renderCatGrid();
+}
+
+function renderCatGrid() {
+  const q = document.getElementById('cat-buscar').value.toLowerCase();
+  let mats = BD.catalogo;
+  if (grupoActivo !== 'Todos') mats = mats.filter(m => (m.grupo||'Otros') === grupoActivo);
+  if (q) mats = mats.filter(m => m.nombre.toLowerCase().includes(q));
+
+  document.getElementById('cat-grid').innerHTML = mats.map(m => {
+    const enCarrito = carrito.find(c => c.nombre === m.nombre);
+    return `<button class="mat-btn" onclick="agregarAlCarrito('${m.nombre.replace(/'/g,"\\'")}','${m.unidad||''}')">
+      ${enCarrito ? `<div class="mat-en-carrito">${enCarrito.cantidad}</div>` : ''}
+      <span class="mat-nombre">${m.nombre}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:2px;">
+        <span style="font-size:11px;color:var(--txt-3);font-weight:500;font-family:'DM Mono',monospace;white-space:nowrap;">${m.unidad||'—'}</span>
+        ${m.precio>0
+          ? `<span style="font-size:12px;font-weight:700;color:var(--verde);font-family:'DM Mono',monospace;white-space:nowrap;">$${m.precio.toLocaleString('es-MX')}</span>`
+          : `<span style="font-size:11px;color:var(--txt-3);">S/P</span>`}
+      </div>
+    </button>`;
+  }).join('') || `<div style="grid-column:1/-1;color:var(--txt-3);font-size:13px;padding:20px;">Sin materiales en esta categoría.</div>`;
+}
+
+// ══════════════════════════════════════════════
+// TOGGLE VENTA / COTIZACIÓN
+// ══════════════════════════════════════════════
+let esCotizacion = false;
+
+function toggleModo() {
+  esCotizacion = !esCotizacion;
+  const track      = document.getElementById('modo-track');
+  const thumb      = document.getElementById('modo-thumb');
+  const titulo     = document.getElementById('carrito-titulo');
+  const lblVenta   = document.getElementById('label-venta');
+  const lblCotiz   = document.getElementById('label-cotizacion');
+  const btnLabel   = document.getElementById('btn-cobrar-label');
+
+  if (esCotizacion) {
+    track.style.background   = 'var(--naranja)';
+    thumb.style.transform    = 'translateX(18px)';
+    titulo.textContent       = 'Cotización';
+    lblVenta.style.color     = 'var(--txt-3)';
+    lblCotiz.style.color     = 'var(--naranja)';
+    btnLabel.textContent     = 'Imprimir cotización';
+  } else {
+    track.style.background   = 'var(--gris-300,#D1D1D6)';
+    thumb.style.transform    = 'translateX(0)';
+    titulo.textContent       = 'Venta en curso';
+    lblVenta.style.color     = 'var(--naranja)';
+    lblCotiz.style.color     = 'var(--txt-3)';
+    btnLabel.textContent     = 'Cobrar';
+  }
+  recalcTotales();
+}
+// ══════════════════════════════════════════════
+function agregarAlCarrito(nombre, unidad) {
+  const existente = carrito.find(c => c.nombre === nombre);
+  if (existente) {
+    existente.cantidad++;
+  } else {
+    const enCatalogo = BD.catalogo.find(m => m.nombre === nombre);
+    carrito.push({ id: Date.now() + Math.random(), nombre, unidad, cantidad: 1, precio: enCatalogo?.precio || 0 });
+  }
+  renderCarrito();
+  renderCatGrid();
+}
+
+function renderCarrito() {
+  const empty = document.getElementById('carrito-empty');
+  const contenedor = document.getElementById('carrito-items');
+
+  // Limpiar items previos (no el empty)
+  [...contenedor.querySelectorAll('.carrito-item')].forEach(e => e.remove());
+
+  if (!carrito.length) {
+    empty.style.display = 'flex';
+    recalcTotales();
+    return;
+  }
+  empty.style.display = 'none';
+
+  carrito.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'carrito-item';
+    div.id = 'ci_' + item.id;
+    div.innerHTML = `
+      <div class="ci-top">
+        <span class="ci-nombre">${item.nombre}</span>
+        <button class="ci-del" onclick="quitarDelCarrito(${item.id})">×</button>
+      </div>
+      <div class="ci-controles">
+        <span class="ci-label">Cant.</span>
+        <input class="ci-input" type="number" min="0.01" step="any" value="${item.cantidad}"
+          style="width:70px;" oninput="actualizarItem(${item.id},'cantidad',this.value)">
+        <span class="ci-label" style="margin-left:4px;">P.U. $</span>
+        <input class="ci-input" type="number" min="0" step="any" value="${item.precio||''}"
+          placeholder="0.00" oninput="actualizarItem(${item.id},'precio',this.value)">
+        <span class="ci-importe" id="imp_${item.id}">$${fmt(item.cantidad*(item.precio||0))}</span>
+      </div>`;
+    contenedor.appendChild(div);
+  });
+
+  recalcTotales();
+}
+
+function actualizarItem(id, campo, val) {
+  const item = carrito.find(c => c.id === id);
+  if (!item) return;
+  item[campo] = parseFloat(val) || 0;
+  const imp = document.getElementById('imp_' + id);
+  if (imp) imp.textContent = '$' + fmt(item.cantidad * item.precio);
+  recalcTotales();
+  // Actualizar badge en grid sin re-render completo
+  renderCatGrid();
+}
+
+function quitarDelCarrito(id) {
+  carrito = carrito.filter(c => c.id !== id);
+  renderCarrito();
+  renderCatGrid();
+}
+
+function limpiarCarrito() {
+  carrito = [];
+  document.getElementById('c_nombre').value = '';
+  document.getElementById('c_telefono').value = '';
+  document.getElementById('c_domicilio').value = '';
+  document.getElementById('c_notas').value = '';
+  document.getElementById('c_factura').checked = false;
+  document.getElementById('c_tipo_pago').value = 'POR_DEFINIR';
+  // Resetear modo a Venta
+  if (esCotizacion) toggleModo();
+  renderCarrito();
+  renderCatGrid();
+}
+
+function recalcTotales() {
+  const total = carrito.reduce((s,i) => s + i.cantidad * (i.precio||0), 0);
+  document.getElementById('t-total').textContent = '$' + fmt(total);
+  document.getElementById('cobrar-total').textContent = '$' + fmt(total);
+  const nombre = document.getElementById('c_nombre').value.trim();
+  // Cotización: se puede imprimir sin cliente. Venta: requiere cliente
+  document.getElementById('btn-cobrar').disabled = !(carrito.length > 0 && (esCotizacion || nombre));
+}
+
+// ══════════════════════════════════════════════
+// COBRAR
+// ══════════════════════════════════════════════
+function cobrar() {
+  if (!carrito.length) return;
+
+  const nombre    = document.getElementById('c_nombre').value.trim();
+  const tel       = document.getElementById('c_telefono').value.trim();
+  const domicilio = document.getElementById('c_domicilio').value.trim();
+  const notas     = document.getElementById('c_notas').value.trim();
+  const factura   = document.getElementById('c_factura').checked;
+  const tipo_pago = document.getElementById('c_tipo_pago').value;
+  const fecha     = new Date();
+  const itemsTicket = carrito.map(i => ({ nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, precio: i.precio||0 }));
+  const total     = carrito.reduce((s,i) => s + i.cantidad*(i.precio||0), 0);
+
+  // ── COTIZACIÓN: solo imprime, no guarda en BD ──
+  if (esCotizacion) {
+    generarTicketPDF({ id_venta: null, esCotizacion: true, fecha, nombre, tel, domicilio, notas, tipo_pago, factura, items: itemsTicket, total });
+    mostrarToast('✓ Cotización impresa');
+    limpiarCarrito();
+    return;
+  }
+
+  // ── VENTA: valida cliente, guarda y genera ticket ──
+  if (!nombre) return;
+
+  const id_venta = generarID();
+  const existe = BD.clientes.find(c => c.nombre.toUpperCase()===nombre.toUpperCase());
+  if (!existe) BD.clientes.push({id:'cli_'+Date.now(), nombre, telefono:tel});
+  else if (tel && !existe.telefono) existe.telefono = tel;
+
+  BD.remisiones.push({ id_remision: id_venta, fecha: fecha.toISOString().split('T')[0], nombre_cliente: nombre, telefono: tel, domicilio, notas, factura, tipo_pago, created_at: fecha.toISOString() });
+  BD.items.push(...carrito.map(item => ({ id_item: Date.now()+Math.random(), id_remision: id_venta, concepto: item.nombre, unidad: item.unidad, cantidad_pedida: item.cantidad, precio_unitario: item.precio||0 })));
+  BD.secuencia++;
+  guardarLocal();
+
+  generarTicketPDF({ id_venta, esCotizacion: false, fecha, nombre, tel, domicilio, notas, tipo_pago, factura, items: itemsTicket, total });
+  mostrarToast(`✓ Venta ${id_venta} registrada`);
+  limpiarCarrito();
+}
+
+// ══════════════════════════════════════════════
+// GENERADOR DE TICKET PDF 80MM — altura dinámica real
+// ══════════════════════════════════════════════
+function generarTicketPDF(datos) {
+  const { jsPDF } = window.jspdf;
+
+  const anchoMM  = 80;
+  const margen   = 5;
+  const imprimible = anchoMM - margen * 2; // 70mm
+  const xC       = anchoMM / 2;
+
+  // ── Renderiza el ticket en un doc dado, devuelve y final ──
+  function renderTicket(doc) {
+    let y = margen;
+
+    const lh = (size) => size * 0.47; // line-height en mm para ese tamaño
+
+    const ESPACIO = (mm = 1.5) => { y += mm; };
+
+    const LINE = (grosor = 0.25) => {
+      y += 3;   // espacio antes de la línea
+      doc.setLineWidth(grosor);
+      doc.line(margen, y, anchoMM - margen, y);
+      y += 4;   // espacio después de la línea
+    };
+
+    // Escribe texto centrado/izq/der con wrapping y devuelve líneas usadas
+    const TXT = (texto, size, bold, align = 'center') => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      const lines = doc.splitTextToSize(String(texto), imprimible);
+      const x = align === 'center' ? xC
+               : align === 'right' ? anchoMM - margen
+               : margen;
+      if (doc._isMeasure) { y += lines.length * lh(size) + 0.6; return; }
+      doc.text(lines, x, y, { align });
+      y += lines.length * lh(size) + 0.6;
+    };
+
+    const TXTLR = (izq, der, sizeIzq, sizeDer, boldIzq, boldDer, maxIzq) => {
+      // Línea con texto izq y der simultáneos
+      doc.setFontSize(sizeIzq);
+      doc.setFont('helvetica', boldIzq ? 'bold' : 'normal');
+      const linesIzq = doc.splitTextToSize(izq, maxIzq || imprimible * 0.65);
+      doc.setFontSize(sizeDer);
+      doc.setFont('helvetica', boldDer ? 'bold' : 'normal');
+      const linesDer = doc.splitTextToSize(der, imprimible * 0.33);
+      const maxLineas = Math.max(linesIzq.length, linesDer.length);
+      if (!doc._isMeasure) {
+        doc.setFontSize(sizeIzq);
+        doc.setFont('helvetica', boldIzq ? 'bold' : 'normal');
+        doc.text(linesIzq, margen, y);
+        doc.setFontSize(sizeDer);
+        doc.setFont('helvetica', boldDer ? 'bold' : 'normal');
+        doc.text(linesDer, anchoMM - margen, y, { align: 'right' });
+      }
+      y += maxLineas * Math.max(lh(sizeIzq), lh(sizeDer)) + 0.8;
+    };
+
+    // Escribe una sola línea forzada (sin wrap) — achica fuente si no cabe
+    const TXT1 = (texto, size, bold, align = 'center') => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      const x = align === 'center' ? xC : align === 'right' ? anchoMM - margen : margen;
+      // Si el texto es más ancho que el área, reducir fuente hasta que quepa
+      let s = size;
+      while (doc.getTextWidth(texto) > imprimible && s > 5) {
+        s -= 0.5;
+        doc.setFontSize(s);
+      }
+      if (!doc._isMeasure) doc.text(texto, x, y, { align });
+      y += lh(s) + 0.6;
+    };
+
+    // ── ENCABEZADO ──
+    ESPACIO(2);
+    TXT('MATERIALES PARA', 16, true);
+    TXT('CONSTRUCCIÓN GAMO', 18, true);
+    ESPACIO(1.5);
+    TXT1('BAHIA TANGOLUNDA MZA 16 LT 197 SECTOR "T"', 9, false);
+    TXT1('CP 70987 SANTA CRUZ HUATULCO OAXACA, MEX', 9, false);
+    ESPACIO(1);
+    TXT('RFC: GANB620331GH0', 11, true);
+    ESPACIO(1);
+    TXT1('WhatsApp: 958 113 8863 | Tel: 958 58 700 88', 10, false);
+    TXT('contacto@gamomateriales.com', 10, false);
+    TXT('IG/FB: GAMO Materiales', 10, false);
+    LINE(0.5);
+
+    // ── FOLIO Y FECHA ──
+    const fechaStr = datos.fecha.toLocaleDateString('es-MX', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const horaStr  = datos.fecha.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit', hour12:true }).toUpperCase();
+    if (datos.esCotizacion) {
+      TXT('COTIZACIÓN', 13, true);
+      ESPACIO(0.5);
+      TXT1(`${fechaStr}   ${horaStr}`, 10, false);
+    } else {
+      TXT1(`Folio: #${datos.id_venta}   ${fechaStr}   ${horaStr}`, 11, true);
+    }
+    ESPACIO(1);
+    LINE(0.3);
+
+    // ── DATOS DEL CLIENTE ──
+    TXT('DATOS DEL CLIENTE', 11, true);
+    ESPACIO(1.5);
+
+    const FILA = (label, valor, sLabel = 11) => {
+      if (!valor) return;
+      doc.setFontSize(sLabel);
+      doc.setFont('helvetica', 'bold');
+      const labelW = doc.getTextWidth(label + ' ');
+      const valLines = doc.splitTextToSize(valor, imprimible - labelW);
+      if (!doc._isMeasure) {
+        doc.text(label, margen, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(valLines, margen + labelW, y);
+      }
+      y += valLines.length * lh(sLabel) + 1.2;
+    };
+
+    FILA('Cliente:', datos.nombre);
+    if (datos.tel) FILA('Celular:', datos.tel);
+    if (datos.domicilio) FILA('Dirección:', datos.domicilio);
+    if (datos.notas) {
+      ESPACIO(0.5);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      if (!doc._isMeasure) doc.text('Notas:', margen, y);
+      y += lh(11) + 0.5;
+      doc.setFont('helvetica', 'normal');
+      const notaLines = doc.splitTextToSize(datos.notas, imprimible);
+      if (!doc._isMeasure) doc.text(notaLines, margen, y);
+      y += notaLines.length * lh(11) + 0.5;
+    }
+
+    LINE(0.4);
+
+    // ── CABECERA ITEMS ──
+    doc.setFontSize(10.5);
+    doc.setFont('helvetica', 'bold');
+    if (!doc._isMeasure) {
+      doc.text('DESCRIPCIÓN', margen, y);
+      doc.text('IMPORTE', anchoMM - margen, y, { align: 'right' });
+    }
+    y += lh(10.5) + 1;
+    ESPACIO(1);
+    LINE(0.3);
+
+    // ── ITEMS ──
+    datos.items.forEach(it => {
+      const importe = it.cantidad * it.precio;
+      const importeStr = `$${fmt(importe)}`;
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      const importeW = doc.getTextWidth(importeStr) + 1;
+      const nombreLines = doc.splitTextToSize(sinAcentos(it.nombre), imprimible - importeW);
+      if (!doc._isMeasure) {
+        doc.text(nombreLines, margen, y);
+        doc.text(importeStr, anchoMM - margen, y, { align: 'right' });
+      }
+      y += nombreLines.length * lh(11) + 0.5;
+
+      // Detalle cantidad x precio
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const detalle = it.precio > 0
+        ? `  ${it.cantidad} ${it.unidad || 'unid.'} x $${fmt(it.precio)}`
+        : `  ${it.cantidad} ${it.unidad || 'unid.'}`;
+      if (!doc._isMeasure) doc.text(detalle, margen, y);
+      y += lh(10) + 2;
+    });
+
+    LINE(0.3);
+
+    // ── PAGO ──
+    const pagoLabel = { EFECTIVO:'Efectivo', TARJETA:'Tarjeta', TRANSFERENCIA:'Transferencia', POR_DEFINIR:'Por definir' }[datos.tipo_pago] || datos.tipo_pago;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    if (!doc._isMeasure) doc.text(`Pago: ${pagoLabel}`, margen, y);
+    y += lh(11) + 1;
+    if (datos.factura) {
+      if (!doc._isMeasure) doc.text('* Solicita tu factura', margen, y);
+      y += lh(11) + 0.5;
+    }
+
+    LINE(0.5);
+    ESPACIO(1);
+
+    // ── TOTAL ──
+    const totalStr = `$${fmt(datos.total)}`;
+    doc.setFontSize(15);
+    doc.setFont('helvetica', 'bold');
+    if (!doc._isMeasure) {
+      doc.text('TOTAL:', margen, y);
+      doc.text(totalStr, anchoMM - margen, y, { align: 'right' });
+    }
+    y += lh(15) + 2;
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica', 'normal');
+    const enLetras = `(${numeroALetras(datos.total)})`;
+    const letrasLines = doc.splitTextToSize(enLetras, imprimible);
+    if (!doc._isMeasure) doc.text(letrasLines, xC, y, { align: 'center' });
+    y += letrasLines.length * lh(9.5) + 2;
+
+    LINE(0.4);
+    ESPACIO(2);
+
+    // ── PIE ──
+    TXT('LOS MATERIALES SE ENTREGAN A PIE DE CARRO', 10.5, true);
+    ESPACIO(1.5);
+    TXT('¡Gracias por su preferencia!', 12, true);
+    ESPACIO(6);
+
+    return y;
+  }
+
+  // ── PASO 1: medir la altura real con un doc dummy ──
+  const docMedida = new jsPDF({ unit:'mm', format:[anchoMM, 2000], orientation:'portrait' });
+  docMedida._isMeasure = true;
+  const alturaReal = renderTicket(docMedida);
+
+  // ── PASO 2: crear el doc con la altura exacta y renderizar ──
+  const docFinal = new jsPDF({ unit:'mm', format:[anchoMM, Math.ceil(alturaReal) + 2], orientation:'portrait' });
+  docFinal._isMeasure = false;
+  renderTicket(docFinal);
+
+  const fechaGuardado = new Date().toISOString().split('T')[0];
+  docFinal.save(`${datos.esCotizacion ? 'Cotizacion' : 'Ticket'}_GAMO_${datos.esCotizacion ? fechaGuardado : datos.id_venta}.pdf`);
+}
+
+function sinAcentos(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+}
+function numeroALetras(n) {
+  const unidades = ['','UN','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE',
+    'DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE'];
+  const decenas  = ['','DIEZ','VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+  const centenas = ['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS',
+    'SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+
+  const entero = Math.floor(n);
+  const cents  = Math.round((n - entero) * 100);
+
+  function grupo(num) {
+    if (num === 0) return '';
+    if (num === 100) return 'CIEN';
+    let res = '';
+    const c = Math.floor(num / 100);
+    const resto = num % 100;
+    if (c > 0) res += centenas[c] + (resto > 0 ? ' ' : '');
+    if (resto < 20) {
+      res += unidades[resto];
+    } else {
+      const d = Math.floor(resto / 10);
+      const u = resto % 10;
+      res += decenas[d] + (u > 0 ? ' Y ' + unidades[u] : '');
+    }
+    return res.trim();
+  }
+
+  function convertir(num) {
+    if (num === 0) return 'CERO';
+    let res = '';
+    const miles = Math.floor(num / 1000);
+    const resto = num % 1000;
+    if (miles > 0) {
+      res += (miles === 1 ? 'MIL' : grupo(miles) + ' MIL');
+      if (resto > 0) res += ' ';
+    }
+    res += grupo(resto);
+    return res.trim();
+  }
+
+  return `${convertir(entero)} PESOS ${String(cents).padStart(2,'0')}/100 M.N.`;
+}
+
+// ══════════════════════════════════════════════
+// DROPDOWN CLIENTE (carrito)
+// ══════════════════════════════════════════════
+function filtrarDropdownCarrito() {
+  const q = document.getElementById('c_nombre').value.toLowerCase();
+  const hits = BD.clientes.filter(c => c.nombre.toLowerCase().includes(q));
+  const dd = document.getElementById('dd-carrito');
+  if (!hits.length) { dd.classList.remove('visible'); recalcTotales(); return; }
+  dd.innerHTML = hits.map(c =>
+    `<div class="cli-opt" onclick="selClienteCarrito('${c.id}')">
+      <div class="on">${c.nombre}</div>
+      <div class="ot">${c.telefono||'Sin teléfono'}</div>
+    </div>`).join('');
+  dd.classList.add('visible');
+  recalcTotales();
+}
+
+function selClienteCarrito(id) {
+  const c = BD.clientes.find(c => c.id===id);
+  if (!c) return;
+  document.getElementById('c_nombre').value = c.nombre;
+  document.getElementById('c_telefono').value = c.telefono||'';
+  const ultima = BD.remisiones
+    .filter(r => r.nombre_cliente.toUpperCase()===c.nombre.toUpperCase())
+    .sort((a,b) => b.fecha.localeCompare(a.fecha))[0];
+  document.getElementById('c_domicilio').value = ultima?.domicilio||'';
+  document.getElementById('c_notas').value = ultima?.notas||'';
+  document.getElementById('dd-carrito').classList.remove('visible');
+  recalcTotales();
+}
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function generarID() {
+  const a = new Date().getFullYear().toString().slice(-2);
+  return 'V' + a + '-' + String(BD.secuencia).padStart(4,'0');
+}
+
+function cerrarTodosDD() {
+  document.querySelectorAll('.cliente-dropdown').forEach(d => d.classList.remove('visible'));
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.cliente-select-wrap') && !e.target.closest('.cli-opt')) cerrarTodosDD();
+});
+
+// ══════════════════════════════════════════════
+// VISTA: CUENTAS
+// ══════════════════════════════════════════════
+// VISTA: VENTAS
+// ══════════════════════════════════════════════
+function totalV(id) {
+  const items = BD.items.filter(i => i.id_remision === id);
+  return items.reduce((s, i) => s + i.cantidad_pedida * i.precio_unitario, 0);
+}
+
+let filtroPeriodo = 'dia';
+
+function setFiltroPeriodo(periodo, btn) {
+  filtroPeriodo = periodo;
+  document.querySelectorAll('#sec-ventas .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderVentas();
+}
+
+function rangoSemana() {
+  const hoy = new Date();
+  const dia = hoy.getDay(); // 0=Dom, 1=Lun...
+  const diffLunes = (dia === 0) ? -6 : 1 - dia;
+  const lunes = new Date(hoy);
+  lunes.setDate(hoy.getDate() + diffLunes);
+  lunes.setHours(0,0,0,0);
+  const domingo = new Date(lunes);
+  domingo.setDate(lunes.getDate() + 6);
+  domingo.setHours(23,59,59,999);
+  return {
+    desde: lunes.toISOString().split('T')[0],
+    hasta: domingo.toISOString().split('T')[0]
+  };
+}
+
+function enPeriodo(fecha) {
+  const hoy = new Date().toISOString().split('T')[0];
+  if (filtroPeriodo === 'dia') return fecha === hoy;
+  if (filtroPeriodo === 'semana') {
+    const { desde, hasta } = rangoSemana();
+    return fecha >= desde && fecha <= hasta;
+  }
+  return true; // 'todo'
+}
+
+function renderVentas() {
+  const q = (document.getElementById('buscar-venta').value || '').toLowerCase();
+  const hoy = new Date().toISOString().split('T')[0];
+  const { desde, hasta } = rangoSemana();
+
+  const activas = BD.remisiones.filter(r => r.estado !== 'CANCELADA');
+  const canceladas = BD.remisiones.filter(r => r.estado === 'CANCELADA').length;
+
+  // KPIs según período seleccionado
+  const activasPeriodo = activas.filter(r => enPeriodo(r.fecha));
+  const totalPeriodo   = activasPeriodo.reduce((s, r) => s + totalV(r.id_remision), 0);
+  const countPeriodo   = activasPeriodo.length;
+
+  const periodoLabel = filtroPeriodo === 'dia' ? 'hoy'
+    : filtroPeriodo === 'semana' ? `lun ${fmtFecha(desde)} – dom ${fmtFecha(hasta)}`
+    : 'histórico';
+
+  document.getElementById('dash-ventas').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;">
+      <div style="padding-right:20px;border-right:1px solid var(--border);">
+        <div class="stat-l">Total vendido</div>
+        <div class="stat-v" style="color:var(--azul);font-family:'DM Mono',monospace;">$${fmt(totalPeriodo)}</div>
+        <div style="font-size:11px;color:var(--txt-3);margin-top:2px;">${periodoLabel}</div>
+      </div>
+      <div style="padding:0 20px;border-right:1px solid var(--border);">
+        <div class="stat-l">Número de ventas</div>
+        <div class="stat-v" style="font-family:'DM Mono',monospace;">${countPeriodo}</div>
+        <div style="font-size:11px;color:var(--txt-3);margin-top:2px;">${periodoLabel}</div>
+      </div>
+      <div style="padding-left:20px;">
+        <div class="stat-l">Canceladas</div>
+        <div class="stat-v" style="color:var(--rojo);font-family:'DM Mono',monospace;">${canceladas}</div>
+        <div style="font-size:11px;color:var(--txt-3);margin-top:2px;">no suman al total</div>
+      </div>
+    </div>`;
+
+  // ── LISTA — siempre muestra todas, filtrada por búsqueda ──
+  let remisiones = [...BD.remisiones].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  if (q) remisiones = remisiones.filter(r =>
+    r.nombre_cliente.toLowerCase().includes(q) || r.id_remision.toLowerCase().includes(q)
+  );
+
+  const lista = document.getElementById('lista-ventas');
+  if (!remisiones.length) {
+    lista.innerHTML = `<div class="empty"><div class="ei">📋</div><p>Sin ventas registradas.</p></div>`;
+    return;
+  }
+
+  lista.innerHTML = remisiones.map(r => {
+    const items  = BD.items.filter(i => i.id_remision === r.id_remision);
+    const total  = totalV(r.id_remision);
+    const tipoPagoLabel = { EFECTIVO:'Efectivo', TARJETA:'Tarjeta', TRANSFERENCIA:'Transferencia', POR_DEFINIR:'Por definir' }[r.tipo_pago] || r.tipo_pago || '—';
+    const cancelada = r.estado === 'CANCELADA';
+
+    return `<div class="card" style="margin-bottom:10px;${cancelada ? 'opacity:.55;' : ''}">
+      <!-- CABECERA -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="id-tag" style="${cancelada ? 'text-decoration:line-through;' : ''}">${r.id_remision}</span>
+            <span style="font-size:12px;color:var(--txt-3);">${fmtFecha(r.fecha)}</span>
+            ${cancelada ? `<span class="badge b-rojo">✕ Cancelada</span>` : ''}
+            ${r.factura && !cancelada ? `<span class="badge b-morado">Factura</span>` : ''}
+            ${!cancelada ? `<span class="badge b-gris">${tipoPagoLabel}</span>` : ''}
+          </div>
+          <div style="font-size:15px;font-weight:700;margin-top:5px;${cancelada ? 'text-decoration:line-through;color:var(--txt-3);' : ''}">${r.nombre_cliente}</div>
+          ${r.telefono && !cancelada ? `<div style="font-size:12px;color:var(--txt-3);">📞 ${r.telefono}</div>` : ''}
+          ${r.domicilio && !cancelada ? `<div style="font-size:12px;color:var(--txt-3);">📍 ${r.domicilio}</div>` : ''}
+          ${r.notas && !cancelada ? `<div style="font-size:12px;color:var(--txt-3);">📝 ${r.notas}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt-3);">Total</div>
+            <div style="font-size:20px;font-weight:700;font-family:'DM Mono',monospace;${cancelada ? 'text-decoration:line-through;color:var(--txt-3);' : ''}">$${fmt(total)}</div>
+          </div>
+          ${!cancelada
+            ? `<button class="btn btn-sm" style="background:var(--rojo-soft);color:var(--rojo);border:1px solid var(--rojo);font-size:11px;font-weight:700;"
+                onclick="cancelarVenta('${r.id_remision}')">✕ Cancelar venta</button>`
+            : `<span style="font-size:11px;color:var(--txt-3);">Folio anulado</span>`}
+        </div>
+      </div>
+      <!-- PRODUCTOS -->
+      <div class="tabla-wrap">
+        <table style="font-size:12px;">
+          <thead><tr>
+            <th>Producto</th><th class="th-r">Cant.</th><th class="th-r">P.U.</th><th class="th-r">Importe</th>
+          </tr></thead>
+          <tbody>
+            ${items.map(it => `<tr>
+              <td>${it.concepto}${it.unidad ? ` <span style="color:var(--txt-3);">(${it.unidad})</span>` : ''}</td>
+              <td class="td-r">${it.cantidad_pedida}</td>
+              <td class="td-r">$${fmt(it.precio_unitario)}</td>
+              <td class="td-r" style="font-weight:600;">$${fmt(it.cantidad_pedida * it.precio_unitario)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function cancelarVenta(id) {
+  const r = BD.remisiones.find(r => r.id_remision === id);
+  if (!r) return;
+  if (!confirm(`¿Cancelar la venta ${id} de ${r.nombre_cliente}?\n\nEl folio quedará anulado en el historial pero no se eliminará.`)) return;
+  r.estado = 'CANCELADA';
+  r.cancelado_en = new Date().toISOString();
+  guardarLocal();
+  renderVentas();
+  mostrarToast(`✕ Venta ${id} cancelada`);
+}
+// ══════════════════════════════════════════════
+const GRUPOS_LIST = ['Cemento','Arena y Grava','Acero','Tabicón y Block','Adoquín','Losa','Tubular y Lámina','Postes','Sonotubo','Otros'];
+const UNIDADES_LIST = ['Pieza','Bulto','M3','Ml','KG','Bolsa','Viaje','Bote'];
+
+function renderCatAdmin() {
+  const q = (document.getElementById('cat-admin-buscar')?.value||'').toLowerCase();
+  let mats = BD.catalogo;
+  if (q) mats = mats.filter(m => m.nombre.toLowerCase().includes(q) || (m.grupo||'').toLowerCase().includes(q));
+
+  const tbody = document.getElementById('lista-cat-admin');
+  if (!tbody) return;
+
+  if (!mats.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--txt-3);">Sin materiales.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = mats.map(m => {
+    const i = BD.catalogo.indexOf(m);
+    return `<tr id="cat-row-${i}">
+      <td style="font-weight:600;font-size:13px;">${m.nombre}</td>
+      <td style="font-size:13px;color:var(--txt-2);">${m.unidad||'—'}</td>
+      <td><span style="font-size:11px;color:var(--azul);background:var(--azul-soft);padding:2px 7px;border-radius:12px;font-weight:600;">${m.grupo||'Otros'}</span></td>
+      <td class="td-r" style="font-family:'DM Mono',monospace;font-weight:600;">
+        ${m.precio>0?'$'+fmt(m.precio):'<span style="color:var(--txt-3);">—</span>'}
+      </td>
+      <td style="text-align:right;">
+        <button class="btn btn-secondary btn-sm" onclick="abrirEditarMat(${i})" style="margin-right:4px;">Editar</button>
+        <button class="btn-del-row" onclick="eliminarMat(${i})">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function agregarMat() {
+  const nombre = document.getElementById('nuevo-mat').value.trim();
+  const unidad = document.getElementById('nuevo-mat-unidad').value;
+  const precio = parseFloat(document.getElementById('nuevo-mat-precio').value)||0;
+  const grupo  = document.getElementById('nuevo-mat-grupo').value||'Otros';
+  if (!nombre) { alert('Escribe el nombre del material.'); return; }
+  if (BD.catalogo.find(m => m.nombre.toLowerCase()===nombre.toLowerCase())) { alert('Ya existe ese material.'); return; }
+  BD.catalogo.push({ nombre, unidad, precio, grupo });
+  BD.catalogo.sort((a,b) => a.grupo.localeCompare(b.grupo)||a.nombre.localeCompare(b.nombre));
+  document.getElementById('nuevo-mat').value='';
+  document.getElementById('nuevo-mat-precio').value='';
+  guardarLocal(); renderCatAdmin(); renderGrupos(); renderCatGrid();
+  mostrarToast('✓ Material agregado al catálogo');
+}
+
+function eliminarMat(i) {
+  if (!confirm(`¿Eliminar "${BD.catalogo[i].nombre}"?`)) return;
+  BD.catalogo.splice(i,1); guardarLocal(); renderCatAdmin(); renderGrupos(); renderCatGrid();
+  mostrarToast('Material eliminado');
+}
+
+// ── EDITAR INLINE VÍA MODAL ──
+let editandoIdx = null;
+
+function abrirEditarMat(i) {
+  editandoIdx = i;
+  const m = BD.catalogo[i];
+  document.getElementById('edit-mat-nombre').value = m.nombre;
+  document.getElementById('edit-mat-unidad').value = m.unidad||'';
+  document.getElementById('edit-mat-precio').value = m.precio||0;
+  document.getElementById('edit-mat-grupo').value  = m.grupo||'Otros';
+  document.getElementById('modal-editar-mat').classList.add('visible');
+}
+
+function guardarEditarMat() {
+  if (editandoIdx === null) return;
+  const nombre = document.getElementById('edit-mat-nombre').value.trim();
+  if (!nombre) { alert('El nombre no puede estar vacío.'); return; }
+  BD.catalogo[editandoIdx] = {
+    nombre,
+    unidad: document.getElementById('edit-mat-unidad').value,
+    precio: parseFloat(document.getElementById('edit-mat-precio').value)||0,
+    grupo:  document.getElementById('edit-mat-grupo').value||'Otros'
+  };
+  BD.catalogo.sort((a,b) => a.grupo.localeCompare(b.grupo)||a.nombre.localeCompare(b.nombre));
+  guardarLocal(); renderCatAdmin(); renderGrupos(); renderCatGrid();
+  cerrarModal('modal-editar-mat');
+  mostrarToast('✓ Material actualizado');
+  editandoIdx = null;
+}
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+function cerrarModal(id) { document.getElementById(id).classList.remove('visible'); }
+function fmt(n) { return Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtFecha(str) {
+  if (!str) return '—';
+  const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const p=str.split('-');
+  return p.length===3?`${p[2]} ${meses[parseInt(p[1])-1]} ${p[0]}`:str;
+}
+function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]/g,'_'); }
+
+function mostrarToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ══════════════════════════════════════════════
+// PERSISTENCIA
+// ══════════════════════════════════════════════
+function guardarLocal() {
+  try { localStorage.setItem('gamo_bd_v4', JSON.stringify(BD)); } catch(e) {}
+}
+
+function cargarLocal() {
+  try {
+    const data = localStorage.getItem('gamo_bd_v4');
+    if (data) BD = { remisiones:[],items:[],clientes:[],catalogo:[],secuencia:1,...JSON.parse(data) };
+  } catch(e) {}
+  if (!BD.catalogo.length) BD.catalogo = CATALOGO_BASE.map(m => ({...m}));
+}
+
+function exportarExcel() {
+  const wb = XLSX.utils.book_new();
+  const ventas = BD.remisiones.map(r => ({
+    ID_Venta:r.id_remision, Fecha:r.fecha, Cliente:r.nombre_cliente, Telefono:r.telefono||'',
+    Domicilio:r.domicilio||'', Notas:r.notas||'', Factura:r.factura?'Sí':'No',
+    Tipo_Pago:r.tipo_pago||'POR_DEFINIR',
+    Estado: r.estado || 'ACTIVA',
+    Cancelado_En: r.cancelado_en || '',
+    Total: totalV(r.id_remision),
+    Creado_En:r.created_at||''
+  }));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(ventas.length?ventas:[{}]),'Ventas');
+  const items = BD.items.map(i => ({
+    ID_Item:String(i.id_item),ID_Venta:i.id_remision,Concepto:i.concepto,Unidad:i.unidad||'',
+    Cantidad:i.cantidad_pedida,Precio_Unitario:i.precio_unitario
+  }));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(items.length?items:[{}]),'Items');
+  const cli = BD.clientes.map(c => ({ID_Cliente:c.id,Nombre:c.nombre,Telefono:c.telefono||''}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cli.length?cli:[{}]),'Clientes');
+  const cat = BD.catalogo.map(m => ({Nombre:m.nombre,Unidad:m.unidad||'',Precio:m.precio||0,Grupo:m.grupo||'Otros'}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cat.length?cat:[{}]),'Catalogo');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([{Secuencia:BD.secuencia}]),'Config');
+  XLSX.writeFile(wb,`GAMO_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+function importarExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result,{type:'binary'});
+      const leer = n => { const ws=wb.Sheets[n]; return ws?XLSX.utils.sheet_to_json(ws,{defval:''}):[] };
+      const rV=leer('Ventas'),rI=leer('Items'),rC=leer('Clientes'),rM=leer('Catalogo'),rCfg=leer('Config');
+      if (!rV.length&&!rI.length) { alert('Archivo no reconocido como GAMO.'); return; }
+      BD.remisiones = rV.filter(r=>r.ID_Venta).map(r => ({
+        id_remision:String(r.ID_Venta),fecha:String(r.Fecha||''),nombre_cliente:r.Cliente||'',
+        telefono:String(r.Telefono||''),domicilio:r.Domicilio||'',notas:r.Notas||'',
+        factura:r.Factura==='Sí',tipo_pago:r.Tipo_Pago||'POR_DEFINIR',
+        estado: r.Estado||'ACTIVA',
+        cancelado_en: r.Cancelado_En||'',
+        created_at:r.Creado_En||''
+      }));
+      BD.items = rI.filter(i=>i.ID_Venta).map(i => ({
+        id_item:parseFloat(i.ID_Item)||Date.now()+Math.random(),id_remision:String(i.ID_Venta),
+        concepto:i.Concepto||'',unidad:i.Unidad||'',
+        cantidad_pedida:parseFloat(i.Cantidad)||0,
+        precio_unitario:parseFloat(i.Precio_Unitario)||0
+      }));
+      BD.clientes = rC.filter(c=>c.Nombre).map(c => ({id:String(c.ID_Cliente||'cli_'+Date.now()),nombre:c.Nombre,telefono:String(c.Telefono||'')}));
+      BD.catalogo = rM.filter(m=>m.Nombre).map(m => ({nombre:m.Nombre,unidad:m.Unidad||'',precio:parseFloat(m.Precio)||0,grupo:m.Grupo||'Otros'}));
+      if (!BD.catalogo.length) BD.catalogo = CATALOGO_BASE.map(m=>({...m}));
+      BD.secuencia = rCfg.length?(parseInt(rCfg[0].Secuencia)||1):1;
+      guardarLocal(); renderGrupos(); renderCatGrid();
+      mostrarToast(`✓ ${BD.remisiones.length} ventas · ${BD.clientes.length} clientes cargados`);
+    } catch(err) { console.error(err); alert('Error al leer el archivo Excel.'); }
+  };
+  reader.readAsBinaryString(file); input.value='';
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+cargarLocal();
+renderGrupos();
+renderCatGrid();
+// Inicializar colores del toggle
+document.getElementById('label-venta').style.color   = 'var(--naranja)';
+document.getElementById('label-cotizacion').style.color = 'var(--txt-3)';
+
+// Trigger recalc on cliente input change
+document.getElementById('c_nombre').addEventListener('input', recalcTotales);
+</script>
+</body>
+</html>
