@@ -1639,16 +1639,21 @@ function guardarSheets() {
     secuencia: BD.secuencia
   };
 
+  // Apps Script requiere los datos como parámetro URL en el POST
+  const formData = new FormData();
+  formData.append('payload', JSON.stringify(payload));
+
   fetch(API_URL, {
     method: 'POST',
-    body: JSON.stringify(payload)
-  }).then(r => r.json()).then(res => {
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain' }
+  })
+  .then(r => r.json())
+  .then(res => {
     if (res.ok) mostrarIndicadorSync('✓ Sincronizado');
-    else console.error('Error Sheets:', res.error);
-  }).catch(err => {
-    console.warn('Sin conexión, datos guardados localmente:', err);
-    mostrarIndicadorSync('⚠ Sin conexión');
-  });
+    else { console.error('Error Sheets:', res.error); mostrarIndicadorSync('⚠ Error al guardar'); }
+  })
+  .catch(() => mostrarIndicadorSync('⚠ Sin conexión'));
 }
 
 // ── SHEETS: LEER al iniciar ──
@@ -1656,38 +1661,35 @@ async function cargarSheets() {
   mostrarCargando(true);
   try {
     const res = await fetch(`${API_URL}?accion=leer`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const datos = await res.json();
-
     if (!datos.ok) throw new Error(datos.error);
 
-    // Solo carga si hay datos en Sheets
     if (datos.remisiones && datos.remisiones.length > 0) {
       BD.remisiones = datos.remisiones.map(r => ({
-        id_remision:  String(r.ID_Venta||''),
-        fecha:        String(r.Fecha||''),
+        id_remision:    String(r.ID_Venta||''),
+        fecha:          String(r.Fecha||''),
         nombre_cliente: r.Cliente||'',
-        telefono:     String(r.Telefono||''),
-        domicilio:    r.Domicilio||'',
-        notas:        r.Notas||'',
-        factura:      r.Factura === 'Sí',
-        tipo_pago:    r.Tipo_Pago||'POR_DEFINIR',
-        estado:       r.Estado||'ACTIVA',
-        cancelado_en: r.Cancelado_En||'',
-        created_at:   r.Creado_En||''
+        telefono:       String(r.Telefono||''),
+        domicilio:      r.Domicilio||'',
+        notas:          r.Notas||'',
+        factura:        r.Factura === 'Sí',
+        tipo_pago:      r.Tipo_Pago||'POR_DEFINIR',
+        estado:         r.Estado||'ACTIVA',
+        cancelado_en:   r.Cancelado_En||'',
+        created_at:     r.Creado_En||''
       }));
     }
-
     if (datos.items && datos.items.length > 0) {
       BD.items = datos.items.map(i => ({
-        id_item:        parseFloat(i.ID_Item)||Date.now()+Math.random(),
-        id_remision:    String(i.ID_Venta||''),
-        concepto:       i.Concepto||'',
-        unidad:         i.Unidad||'',
+        id_item:           parseFloat(i.ID_Item)||Date.now()+Math.random(),
+        id_remision:       String(i.ID_Venta||''),
+        concepto:          i.Concepto||'',
+        unidad:            i.Unidad||'',
         cantidad_pedida:   parseFloat(i.Cantidad)||0,
         precio_unitario:   parseFloat(i.Precio_Unitario)||0
       }));
     }
-
     if (datos.clientes && datos.clientes.length > 0) {
       BD.clientes = datos.clientes.map(c => ({
         id:       String(c.ID_Cliente||'cli_'+Date.now()),
@@ -1695,7 +1697,6 @@ async function cargarSheets() {
         telefono: String(c.Telefono||'')
       }));
     }
-
     if (datos.catalogo && datos.catalogo.length > 0) {
       BD.catalogo = datos.catalogo.map(m => ({
         nombre:  m.Nombre||'',
@@ -1704,20 +1705,19 @@ async function cargarSheets() {
         grupo:   m.Grupo||'Otros'
       }));
     }
-
     if (datos.secuencia) BD.secuencia = parseInt(datos.secuencia)||1;
 
-    guardarLocal(); // actualiza caché local con lo que vino de Sheets
-    mostrarToast('✓ Datos cargados desde Google Sheets');
+    guardarLocal();
+    mostrarToast('✓ Conectado a Google Sheets');
 
   } catch(err) {
-    console.warn('No se pudo leer Sheets, usando caché local:', err);
-    mostrarToast('⚠ Sin conexión — usando datos locales');
+    console.warn('Sheets no disponible, usando caché local:', err);
+    mostrarToast('⚠ Sin conexión — datos locales');
   } finally {
     mostrarCargando(false);
     renderGrupos();
     renderCatGrid();
-    document.getElementById('label-venta').style.color   = 'var(--naranja)';
+    document.getElementById('label-venta').style.color    = 'var(--naranja)';
     document.getElementById('label-cotizacion').style.color = 'var(--txt-3)';
     document.getElementById('c_nombre').addEventListener('input', recalcTotales);
   }
